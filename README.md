@@ -8,6 +8,7 @@ Uses Victron instant readout to get
 - Battery current in Amps
 - Battery voltage in Volts
 - Todays yield in kWh
+- Current PV power in W
 
 Some time in the future this code will be used to shut off any AhoyDTU compatible inverter
 if the voltage of a battery connected to a Victron Smart Solar MPPT gets too low.
