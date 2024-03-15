@@ -24,40 +24,13 @@ type MPPTConnection struct {
 
 // MPPTData contains the most relevant data in human readable form
 type MPPTData struct {
-	DeviceState    byte
-	ChargerError   byte
+	DeviceState    uint8   // custom victron state values. 3 == MPPT
+	ChargerError   uint8   // custom victron error codes.
 	BatteryVoltage float32 // V
 	BatteryCurrent float32 // A
 	YieldToday     float32 // kWH
 	PVPower        uint16  // W
-	LoadCurrent    uint32  // W TODO:FIXME: currently unable to parse the 9 bits correctly
-}
-
-// ParseDecrypted parses the decrypted ciphertext to MPPT DataPoints
-func parseDecrypted(plaintext []byte) (*MPPTData, error) {
-	if len(plaintext) < 12 {
-		return nil, fmt.Errorf("decoded plaintext too short! should be at least 12 bytes, but is %d", len(plaintext))
-	}
-	raw := rawData{
-		DeviceState:    plaintext[0],
-		ChargerError:   plaintext[1],
-		BatteryVoltage: plaintext[2:4],
-		BatteryCurrent: plaintext[4:6],
-		YieldToday:     plaintext[6:8],
-		PVPower:        plaintext[8:10],
-		LoadCurrent:    plaintext[10:],
-	}
-
-	mppt := MPPTData{
-		DeviceState:    1, // TODO
-		ChargerError:   1, // TODO
-		BatteryVoltage: float32(binary.LittleEndian.Uint16(raw.BatteryVoltage)) * 0.01,
-		BatteryCurrent: float32(binary.LittleEndian.Uint16(raw.BatteryCurrent)) * 0.1,
-		YieldToday:     float32(binary.LittleEndian.Uint16(raw.YieldToday)) * 0.01,
-		PVPower:        binary.LittleEndian.Uint16(raw.PVPower),
-		LoadCurrent:    1, // TODO
-	}
-	return &mppt, nil
+	LoadCurrent    float32 // W TODO:FIXME: currently unable to parse the 9 bits correctly
 }
 
 // New create a new MPPTConnection for receiving and decrypting victron mppt data
@@ -92,6 +65,10 @@ func (vc *MPPTConnection) StartScanning() error {
 		return err
 	}
 	return nil
+}
+
+func (vc *MPPTConnection) GetChannel() *chan map[uint16][]byte {
+	return vc.AdvertisementChan
 }
 
 // Decrypt takes the nonce from the payload, and the Key from MPPTConnection to AES-CRT decrypt a received advertisement
@@ -150,4 +127,33 @@ func (vc *MPPTConnection) Parse(ciphertext []byte) (*MPPTData, error) {
 		return nil, err
 	}
 	return mpptData, nil
+}
+
+// ParseDecrypted parses the decrypted ciphertext to MPPT DataPoints
+func parseDecrypted(plaintext []byte) (*MPPTData, error) {
+	if len(plaintext) < 12 {
+		return nil, fmt.Errorf("decoded plaintext too short! should be at least 12 bytes, but is %d", len(plaintext))
+	}
+	raw := rawData{
+		DeviceState:    plaintext[0],
+		ChargerError:   plaintext[1],
+		BatteryVoltage: plaintext[2:4],
+		BatteryCurrent: plaintext[4:6],
+		YieldToday:     plaintext[6:8],
+		PVPower:        plaintext[8:10],
+		LoadCurrent:    plaintext[10:],
+	}
+
+	log.Debug().Msgf("raw deviceState: %x, raw chargerError: %x, raw load current: %x", raw.DeviceState, raw.ChargerError, raw.LoadCurrent)
+
+	mppt := MPPTData{
+		DeviceState:    uint8(raw.DeviceState),
+		ChargerError:   uint8(raw.DeviceState),
+		BatteryVoltage: float32(binary.LittleEndian.Uint16(raw.BatteryVoltage)) * 0.01,
+		BatteryCurrent: float32(binary.LittleEndian.Uint16(raw.BatteryCurrent)) * 0.1,
+		YieldToday:     float32(binary.LittleEndian.Uint16(raw.YieldToday)) * 0.01,
+		PVPower:        binary.LittleEndian.Uint16(raw.PVPower),
+		LoadCurrent:    float32(binary.LittleEndian.Uint16(raw.LoadCurrent)) * 0.1,
+	}
+	return &mppt, nil
 }

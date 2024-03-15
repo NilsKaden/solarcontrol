@@ -2,7 +2,9 @@ package main
 
 import (
 	"solarcontrol/pkg/ahoy"
+	"solarcontrol/pkg/controller"
 	"solarcontrol/pkg/mppt"
+	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/rs/zerolog"
@@ -39,17 +41,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	go vc.StartScanning()
 
-	for advMsg := range *vc.AdvertisementChan {
-		for _, advBytes := range advMsg {
-			mppt, err := vc.Parse(advBytes)
-			if err != nil {
-				panic(err)
-			}
-
-			log.Info().Msgf("VBatt: %.2fV IBatt: %.2fA Pday: %.2fkWh Wpv: %dW", mppt.BatteryVoltage, mppt.BatteryCurrent, mppt.YieldToday, mppt.PVPower)
-
+	for {
+		err := controller.Start(ah, vc)
+		if err != nil {
+			log.Error().Err(err).Msg("error scanning. Waiting for a minute and trying again")
+			time.Sleep(time.Minute)
 		}
 	}
 }
