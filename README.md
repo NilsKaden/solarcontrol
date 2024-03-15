@@ -19,6 +19,7 @@ Additionally, we can turn on the inverter, or increase power, if the battery get
 
 Make sure to set the environment variables VICTRON_UUID and VICTRON_KEY. 
 I recommend filling in the values in the .envrc-sample and renaming it to .envrc 
+
 Can be comfortably loaded with [direnv](https://direnv.net/).
 
 VICTRON_UUID can be found using a bluetooth scanner for your system. nRF Connect from Nordic works great.

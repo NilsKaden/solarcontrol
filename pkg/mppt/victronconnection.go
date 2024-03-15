@@ -14,36 +14,66 @@ import (
 
 var adapter = bluetooth.DefaultAdapter
 
-// VictronConnection looks for a BLE device with the given UUID and sends a message to the AdverisementChan for each advertisement
-type VictronConnection struct {
+// MPPTConnection looks for a BLE device with the given UUID and sends a message to the AdverisementChan for each advertisement
+type MPPTConnection struct {
 	AdvertisementChan *chan map[uint16][]byte
 	UUID              string
 	Timeout           time.Duration
 	Key               string
 }
 
-// VictronAdvertisementInfo contains the raw response, still encrypted
-type VictronAdvertisementInfo struct {
-	RecordType               byte
-	Nonce                    []byte
-	FirstByteOfEncryptionKey byte // whatever we shall use this for
-	Ciphertext               []byte
+// MPPTData contains the most relevant data in human readable form
+type MPPTData struct {
+	DeviceState    byte
+	ChargerError   byte
+	BatteryVoltage float32 // V
+	BatteryCurrent float32 // A
+	YieldToday     float32 // kWH
+	PVPower        uint16  // W
+	LoadCurrent    uint32  // W TODO:FIXME: currently unable to parse the 9 bits correctly
 }
 
-// New create a new VictronConnection for receiving and decrypting victron mppt data
-func New(victronUUID, victronKey string) (*VictronConnection, error) {
+// ParseDecrypted parses the decrypted ciphertext to MPPT DataPoints
+func parseDecrypted(plaintext []byte) (*MPPTData, error) {
+	if len(plaintext) < 12 {
+		return nil, fmt.Errorf("decoded plaintext too short! should be at least 12 bytes, but is %d", len(plaintext))
+	}
+	raw := rawData{
+		DeviceState:    plaintext[0],
+		ChargerError:   plaintext[1],
+		BatteryVoltage: plaintext[2:4],
+		BatteryCurrent: plaintext[4:6],
+		YieldToday:     plaintext[6:8],
+		PVPower:        plaintext[8:10],
+		LoadCurrent:    plaintext[10:],
+	}
+
+	mppt := MPPTData{
+		DeviceState:    1, // TODO
+		ChargerError:   1, // TODO
+		BatteryVoltage: float32(binary.LittleEndian.Uint16(raw.BatteryVoltage)) * 0.01,
+		BatteryCurrent: float32(binary.LittleEndian.Uint16(raw.BatteryCurrent)) * 0.1,
+		YieldToday:     float32(binary.LittleEndian.Uint16(raw.YieldToday)) * 0.01,
+		PVPower:        binary.LittleEndian.Uint16(raw.PVPower),
+		LoadCurrent:    1, // TODO
+	}
+	return &mppt, nil
+}
+
+// New create a new MPPTConnection for receiving and decrypting victron mppt data
+func New(victronUUID, victronKey string) (*MPPTConnection, error) {
 	advChan := make(chan map[uint16][]byte)
 	err := adapter.Enable()
 	if err != nil {
 		return nil, err
 	}
-	vc := VictronConnection{UUID: victronUUID, AdvertisementChan: &advChan, Timeout: 1 * time.Second, Key: victronKey}
+	vc := MPPTConnection{UUID: victronUUID, AdvertisementChan: &advChan, Timeout: 1 * time.Second, Key: victronKey}
 
 	return &vc, nil
 }
 
 // StartScanning starts looking for BLE Advertisement from the correct UUID and sends it to the channel
-func (vc *VictronConnection) StartScanning() error {
+func (vc *MPPTConnection) StartScanning() error {
 	err := adapter.Scan(func(adapter *bluetooth.Adapter, device bluetooth.ScanResult) {
 		log.Trace().Msg("scanning...")
 		if device.Address.String() == vc.UUID {
@@ -64,8 +94,8 @@ func (vc *VictronConnection) StartScanning() error {
 	return nil
 }
 
-// Decrypt takes the nonce from the payload, and the Key from VictronConnection to AES-CRT decrypt a received advertisement
-func (vc *VictronConnection) Decrypt(vci *VictronAdvertisementInfo) ([]byte, error) {
+// Decrypt takes the nonce from the payload, and the Key from MPPTConnection to AES-CRT decrypt a received advertisement
+func (vc *MPPTConnection) Decrypt(vci *victronAdvertisementInfo) ([]byte, error) {
 	key, err := hex.DecodeString(vc.Key)
 	if err != nil {
 		return nil, err
@@ -91,7 +121,7 @@ func (vc *VictronConnection) Decrypt(vci *VictronAdvertisementInfo) ([]byte, err
 }
 
 // Parse parses the unencrypted values from a received advertisement
-func Parse(ciphertext []byte) (*VictronAdvertisementInfo, error) {
+func (vc *MPPTConnection) Parse(ciphertext []byte) (*MPPTData, error) {
 	log.Debug().Msgf("raw adv data: %x", ciphertext)
 	if len(ciphertext) < 20 { // is 20, but i thought it should be 24? weird
 		return nil, fmt.Errorf("ciphertext too short. Should be at least 24 byte. Was: %d", len(ciphertext))
@@ -104,12 +134,20 @@ func Parse(ciphertext []byte) (*VictronAdvertisementInfo, error) {
 		return nil, err
 	}
 	// first 4 bytes are useless
-	vic := VictronAdvertisementInfo{
+	vai := victronAdvertisementInfo{
 		RecordType:               ciphertext[4],
 		Nonce:                    nonce,
 		FirstByteOfEncryptionKey: ciphertext[7],
 		Ciphertext:               ciphertext[8:],
 	}
 
-	return &vic, nil
+	plaintext, err := vc.Decrypt(&vai)
+	if err != nil {
+		return nil, err
+	}
+	mpptData, err := parseDecrypted(plaintext)
+	if err != nil {
+		return nil, err
+	}
+	return mpptData, nil
 }

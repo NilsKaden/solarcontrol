@@ -1,2 +1,4 @@
 export VICTRON_UUID="your-victron-uuid"
 export VICTRON_KEY="yourvictronencryptionkey"
+export AHOY_ENDPOINT="http://your-ahoy-ip"
+export INVERTER_ID="0"
