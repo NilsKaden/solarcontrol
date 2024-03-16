@@ -9,7 +9,7 @@ import (
 // adjust for different battery types
 const (
 	BatteryTurnOffVoltage = 25.6 // 20%
-	BatteryTurnOnVoltage  = 26.7 // about 70% when charging, implement in the future
+	BatteryTurnOnVoltage  = 26.8 // about 70% when charging, implement in the future
 )
 
 type AhoyInterface interface {
@@ -43,6 +43,19 @@ func NewController(ahoy AhoyInterface, mppt MPPTInterface) (*Controller, error) 
 	return &c, nil
 }
 
+func (c *Controller) TurnOffInverterIfVoltageLow(voltage float32) bool {
+	if voltage < BatteryTurnOffVoltage {
+		log.Info().Msgf("turning off inverter at %.2fV", voltage)
+		err := c.ahoy.SetInverterPower(0, true)
+		if err != nil {
+			log.Error().Err(err).Msgf("UNABLE TO SHUTDOWN INVERTER, BUT BATTERY IS LOW. PANIC")
+			// turn off myStrom Smart Plug
+		}
+		return true
+	}
+	return false
+}
+
 func (c *Controller) Start() error {
 	ch := c.mppt.GetChannel()
 	go c.mppt.StartScanning()
@@ -58,14 +71,7 @@ func (c *Controller) Start() error {
 				"VBatt: %.2fV IBatt: %.2fA Pday: %.2fkWh PV: %dW State: %d Error: %d LoadCurrent: %.2fA ",
 				data.BatteryVoltage, data.BatteryCurrent, data.YieldToday, data.PVPower, data.DeviceState, data.ChargerError, data.LoadCurrent)
 
-			if data.BatteryVoltage < BatteryTurnOffVoltage {
-				log.Info().Msgf("turning off inverter at %.2fV", data.BatteryVoltage)
-				err := c.ahoy.SetInverterPower(0, true)
-				if err != nil {
-					log.Error().Err(err).Msgf("UNABLE TO SHUTDOWN INVERTER, BUT BATTERY IS LOW. PANIC")
-					// turn off myStrom Smart Plug
-				}
-			}
+			c.TurnOffInverterIfVoltageLow(data.BatteryVoltage)
 		}
 	}
 

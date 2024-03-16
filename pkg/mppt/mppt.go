@@ -141,10 +141,13 @@ func parseDecrypted(plaintext []byte) (*MPPTData, error) {
 		BatteryCurrent: plaintext[4:6],
 		YieldToday:     plaintext[6:8],
 		PVPower:        plaintext[8:10],
-		LoadCurrent:    plaintext[10:],
+		LoadCurrent:    plaintext[10:12],
 	}
 
-	log.Debug().Msgf("raw deviceState: %x, raw chargerError: %x, raw load current: %x", raw.DeviceState, raw.ChargerError, raw.LoadCurrent)
+	// since load current is a 9 bit value, but stored in an 16 bit data RecordType
+	// we use bitwise AND with a 16 bit mask to set the last 7 bits to 0
+	mask := uint16(0b111111111)
+	loadCurrent9Bit := mask & uint16(binary.LittleEndian.Uint16(raw.LoadCurrent))
 
 	mppt := MPPTData{
 		DeviceState:    uint8(raw.DeviceState),
@@ -153,7 +156,7 @@ func parseDecrypted(plaintext []byte) (*MPPTData, error) {
 		BatteryCurrent: float32(binary.LittleEndian.Uint16(raw.BatteryCurrent)) * 0.1,
 		YieldToday:     float32(binary.LittleEndian.Uint16(raw.YieldToday)) * 0.01,
 		PVPower:        binary.LittleEndian.Uint16(raw.PVPower),
-		LoadCurrent:    float32(binary.LittleEndian.Uint16(raw.LoadCurrent)) * 0.1,
+		LoadCurrent:    float32(loadCurrent9Bit) * 0.1,
 	}
 	return &mppt, nil
 }
