@@ -1,15 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"github.com/ilyakaznacheev/cleanenv"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"solarcontrol/pkg/ahoy"
 	"solarcontrol/pkg/controller"
 	"solarcontrol/pkg/mppt"
 	"strconv"
 	"time"
-
-	"github.com/ilyakaznacheev/cleanenv"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 type Config struct {
@@ -46,6 +46,9 @@ func main() {
 	}
 	if shutoffVoltage < 10 || shutoffVoltage > 30 {
 		log.Warn().Msgf("atypical shutoffVoltage supplied. Got %.2f. Ignore if you're running a system below 12V or above 26V", shutoffVoltage)
+	}
+	if shutoffVoltage < 1 {
+		panic(fmt.Errorf("supplied shutoffVoltage off %.1f. You must be joking, right?", shutoffVoltage))
 	}
 
 	c, err := controller.NewController(ah, mp, float32(shutoffVoltage))
