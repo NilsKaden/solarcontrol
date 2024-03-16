@@ -34,7 +34,7 @@ type MPPTData struct {
 }
 
 // New create a new MPPTConnection for receiving and decrypting victron mppt data
-func New(victronUUID, victronKey string) (*MPPTConnection, error) {
+func NewMPPT(victronUUID, victronKey string) (*MPPTConnection, error) {
 	advChan := make(chan map[uint16][]byte)
 	err := adapter.Enable()
 	if err != nil {

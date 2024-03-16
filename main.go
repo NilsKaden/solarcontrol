@@ -31,19 +31,19 @@ func main() {
 	log.Info().Msg("starting")
 
 	ah := ahoy.NewAhoy(cfg.InverterID, cfg.AhoyEndpoint)
-	ii, err := ah.GetInverterInfo()
+
+	mp, err := mppt.NewMPPT(cfg.VictronUUID, cfg.VictronKey)
 	if err != nil {
 		panic(err)
 	}
-	log.Info().Msgf("inverter info: %v", ii)
 
-	vc, err := mppt.New(cfg.VictronUUID, cfg.VictronKey)
+	c, err := controller.NewController(ah, mp)
 	if err != nil {
 		panic(err)
 	}
 
 	for {
-		err := controller.Start(ah, vc)
+		err := c.Start()
 		if err != nil {
 			log.Error().Err(err).Msg("error scanning. Waiting for a minute and trying again")
 			time.Sleep(time.Minute)
