@@ -1,15 +1,10 @@
 package controller
 
 import (
+	"fmt"
 	"github.com/rs/zerolog/log"
 	"solarcontrol/pkg/ahoy"
 	"solarcontrol/pkg/mppt"
-)
-
-// adjust for different battery types
-const (
-	BatteryTurnOffVoltage = 25.6 // 20%
-	BatteryTurnOnVoltage  = 26.8 // about 70% when charging, implement in the future
 )
 
 type AhoyInterface interface {
@@ -24,36 +19,59 @@ type MPPTInterface interface {
 }
 
 type Controller struct {
-	ahoy AhoyInterface
-	mppt MPPTInterface
+	ahoy           AhoyInterface
+	mppt           MPPTInterface
+	shutoffVoltage float32
 }
 
-func NewController(ahoy AhoyInterface, mppt MPPTInterface) (*Controller, error) {
+func NewController(ahoy AhoyInterface, mppt MPPTInterface, shutOffVoltage float32) (*Controller, error) {
 	ii, err := ahoy.GetInverterInfo()
 	if err != nil {
 		return nil, err
 	}
 	log.Info().Msgf("inverter info: %#v", ii)
 
+	var voltageErr error = nil
+	for i, ch := range ii.Ch {
+		if ch == nil || len(ch) == 0 {
+			continue
+		}
+		voltage := ch[0]
+		// 25.6 shutdown -> 20.84-30.7V allowed
+		minAcceptableVoltage := shutOffVoltage * 0.8
+		maxAcceptableVoltage := shutOffVoltage * 1.2
+		// if the current voltage is more than 20% different from the shutoffVoltage, we return an error.
+		if voltage < minAcceptableVoltage || voltage > maxAcceptableVoltage {
+			voltageErr = fmt.Errorf("Voltage %.1f measured at ch %d is not in range of ShutoffVoltage: %.1f", voltage, i, shutOffVoltage)
+		}
+	}
+
+	if voltageErr != nil {
+		return nil, voltageErr
+	}
+
 	c := Controller{
-		ahoy: ahoy,
-		mppt: mppt,
+		ahoy:           ahoy,
+		mppt:           mppt,
+		shutoffVoltage: shutOffVoltage,
 	}
 
 	return &c, nil
 }
 
 func (c *Controller) TurnOffInverterIfVoltageLow(voltage float32) bool {
-	if voltage < BatteryTurnOffVoltage {
+	var turnedOffInverter bool = false
+
+	if voltage < c.shutoffVoltage {
 		log.Info().Msgf("turning off inverter at %.2fV", voltage)
 		err := c.ahoy.SetInverterPower(0, true)
 		if err != nil {
 			log.Error().Err(err).Msgf("UNABLE TO SHUTDOWN INVERTER, BUT BATTERY IS LOW. PANIC")
 			// turn off myStrom Smart Plug
 		}
-		return true
+		turnedOffInverter = true
 	}
-	return false
+	return turnedOffInverter
 }
 
 func (c *Controller) Start() error {
@@ -61,7 +79,9 @@ func (c *Controller) Start() error {
 	go c.mppt.StartScanning()
 
 	for btAdvertisement := range *ch {
-		for _, btAdvertisementBytes := range btAdvertisement { // its a map with one key. We only care about the value
+
+		// its a map with one key. We only care about the value
+		for _, btAdvertisementBytes := range btAdvertisement {
 			data, err := c.mppt.Parse(btAdvertisementBytes)
 			if err != nil {
 				return (err)

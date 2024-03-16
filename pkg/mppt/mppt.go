@@ -24,13 +24,13 @@ type MPPTConnection struct {
 
 // MPPTData contains the most relevant data in human readable form
 type MPPTData struct {
-	DeviceState    uint8   // custom victron state values. 3 == MPPT
-	ChargerError   uint8   // custom victron error codes.
+	DeviceState    uint8   // custom victron state values. 0 == off, 3 == MPPT
+	ChargerError   uint8   // custom victron error codes. 3 == no temperature sensor
 	BatteryVoltage float32 // V
 	BatteryCurrent float32 // A
-	YieldToday     float32 // kWH
+	YieldToday     float32 // kWh
 	PVPower        uint16  // W
-	LoadCurrent    float32 // W TODO:FIXME: currently unable to parse the 9 bits correctly
+	LoadCurrent    float32 // A
 }
 
 // New create a new MPPTConnection for receiving and decrypting victron mppt data

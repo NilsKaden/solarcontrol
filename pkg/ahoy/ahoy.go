@@ -21,6 +21,7 @@ type Ahoy struct {
 	InverterID   string
 }
 
+// NewAhoy creates a new ahoy client
 func NewAhoy(inverterID, ahoyEndpoint string) *Ahoy {
 	a := Ahoy{
 		Client:       *http.DefaultClient,
