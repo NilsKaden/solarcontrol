@@ -33,7 +33,7 @@ func NewController(ahoy AhoyInterface, mppt MPPTInterface) (*Controller, error) 
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Msgf("inverter info: %v", ii)
+	log.Info().Msgf("inverter info: %#v", ii)
 
 	c := Controller{
 		ahoy: ahoy,

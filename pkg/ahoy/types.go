@@ -15,7 +15,7 @@ type InverterInfo struct {
 	AlarmCnt       int           `json:"alarm_cnt"`
 	Rssi           int           `json:"rssi"`
 	TsMaxAcPwr     int           `json:"ts_max_ac_pwr"`
-	Ch             [][]int       `json:"ch"`
+	Ch             [][]float32   `json:"ch"`
 	ChName         []string      `json:"ch_name"`
 	ChMaxPwr       []interface{} `json:"ch_max_pwr"`
 }
