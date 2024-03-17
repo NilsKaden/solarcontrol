@@ -88,6 +88,10 @@ func (a *Ahoy) SetInverterPower(powerLimitWatt int, persistent bool) error {
 		return err
 	}
 
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return fmt.Errorf("got status %d from ahoy, but expect 2XX", resp.StatusCode)
+	}
+
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	var ctrlResp CtrlResponse

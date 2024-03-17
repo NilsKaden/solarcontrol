@@ -5,6 +5,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"solarcontrol/pkg/ahoy"
 	"solarcontrol/pkg/mppt"
+	"time"
 )
 
 type AhoyInterface interface {
@@ -18,13 +19,18 @@ type MPPTInterface interface {
 	GetChannel() *chan map[uint16][]byte
 }
 
+type MystromInterface interface {
+	Disable() error
+}
+
 type Controller struct {
 	ahoy           AhoyInterface
 	mppt           MPPTInterface
+	mystrom        MystromInterface
 	shutoffVoltage float32
 }
 
-func NewController(ahoy AhoyInterface, mppt MPPTInterface, shutOffVoltage float32) (*Controller, error) {
+func NewController(ahoy AhoyInterface, mppt MPPTInterface, mystrom MystromInterface, shutOffVoltage float32) (*Controller, error) {
 	ii, err := ahoy.GetInverterInfo()
 	if err != nil {
 		return nil, err
@@ -45,6 +51,7 @@ func NewController(ahoy AhoyInterface, mppt MPPTInterface, shutOffVoltage float3
 	c := Controller{
 		ahoy:           ahoy,
 		mppt:           mppt,
+		mystrom:        mystrom,
 		shutoffVoltage: shutOffVoltage,
 	}
 
@@ -59,9 +66,13 @@ func (c *Controller) TurnOffInverterIfVoltageLow(voltage float32) bool {
 		err := c.ahoy.SetInverterPower(0, false)
 		if err != nil {
 			log.Error().Err(err).Msgf("UNABLE TO SHUTDOWN INVERTER, BUT BATTERY IS LOW. PANIC")
-			// turn off myStrom Smart Plug
 		}
 		turnedOffInverter = true
+		if c.mystrom != nil {
+			time.Sleep(5 * time.Second)
+			// turn off myStrom Smart Plug for extra safety
+			c.mystrom.Disable()
+		}
 	}
 	return turnedOffInverter
 }
