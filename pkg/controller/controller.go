@@ -31,23 +31,15 @@ func NewController(ahoy AhoyInterface, mppt MPPTInterface, shutOffVoltage float3
 	}
 	log.Info().Msgf("inverter info: %#v", ii)
 
-	var voltageErr error = nil
-	for i, ch := range ii.Ch {
-		if ch == nil || len(ch) == 0 {
-			continue
-		}
-		voltage := ch[0]
-		// 25.6 shutdown -> 20.84-30.7V allowed
+	if len(ii.Ch) > 0 && ii.Ch[1] != nil {
+		voltage := ii.Ch[1][0]
 		minAcceptableVoltage := shutOffVoltage * 0.8
 		maxAcceptableVoltage := shutOffVoltage * 1.2
+
 		// if the current voltage is more than 20% different from the shutoffVoltage, we return an error.
 		if voltage < minAcceptableVoltage || voltage > maxAcceptableVoltage {
-			voltageErr = fmt.Errorf("Voltage %.1f measured at ch %d is not in range of ShutoffVoltage: %.1f", voltage, i, shutOffVoltage)
+			return nil, fmt.Errorf("Voltage %.1f measured at ch 1 is not in range of ShutoffVoltage: %.1f", voltage, shutOffVoltage)
 		}
-	}
-
-	if voltageErr != nil {
-		return nil, voltageErr
 	}
 
 	c := Controller{
@@ -64,7 +56,7 @@ func (c *Controller) TurnOffInverterIfVoltageLow(voltage float32) bool {
 
 	if voltage < c.shutoffVoltage {
 		log.Info().Msgf("turning off inverter at %.2fV", voltage)
-		err := c.ahoy.SetInverterPower(0, true)
+		err := c.ahoy.SetInverterPower(0, false)
 		if err != nil {
 			log.Error().Err(err).Msgf("UNABLE TO SHUTDOWN INVERTER, BUT BATTERY IS LOW. PANIC")
 			// turn off myStrom Smart Plug
