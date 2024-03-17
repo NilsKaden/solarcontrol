@@ -8,16 +8,18 @@ import (
 	"solarcontrol/pkg/ahoy"
 	"solarcontrol/pkg/controller"
 	"solarcontrol/pkg/mppt"
+	"solarcontrol/pkg/mystrom"
 	"strconv"
 	"time"
 )
 
 type Config struct {
-	VictronUUID    string `env:"VICTRON_UUID"`
-	VictronKey     string `env:"VICTRON_KEY"`
-	InverterID     string `env:"INVERTER_ID" env-default:"0"`
-	AhoyEndpoint   string `env:"AHOY_ENDPOINT"`
-	ShutoffVoltage string `env:"SHUTOFF_VOLTAGE"`
+	VictronUUID     string `env:"VICTRON_UUID"`
+	VictronKey      string `env:"VICTRON_KEY"`
+	InverterID      string `env:"INVERTER_ID" env-default:"0"`
+	AhoyEndpoint    string `env:"AHOY_ENDPOINT"`
+	ShutoffVoltage  string `env:"SHUTOFF_VOLTAGE"`
+	MystromEndpoint string `env:"MYSTROM_ENDPOINT"`
 }
 
 var cfg Config
@@ -39,6 +41,8 @@ func main() {
 		panic(err)
 	}
 
+	ms := mystrom.NewMystrom(cfg.MystromEndpoint)
+
 	// parse shutoff voltage
 	shutoffVoltage, err := strconv.ParseFloat(cfg.ShutoffVoltage, 32)
 	if err != nil {
@@ -51,7 +55,7 @@ func main() {
 		panic(fmt.Errorf("supplied shutoffVoltage off %.1f. You must be joking, right?", shutoffVoltage))
 	}
 
-	c, err := controller.NewController(ah, mp, float32(shutoffVoltage))
+	c, err := controller.NewController(ah, mp, ms, float32(shutoffVoltage))
 	if err != nil {
 		panic(err)
 	}

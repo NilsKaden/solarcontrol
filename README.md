@@ -3,6 +3,7 @@ Solarcontrol ensures battery safety when running grid tie inverters off a batter
 
 Turns off any AHOY DTU compatible inverter if the battery voltage gets too low.
 Battery measurements are taken from victron MPPTs via bluetooth instant readout.
+If the converter is connected to grid via a mystrom plug, we can turn that off, too.
 
 
 ## How to run
@@ -13,6 +14,7 @@ Make sure to set the environment variables
 - AHOY_ENDPOINT
 - INVERTER_ID
 - SHUTOFF_VOLTAGE
+- MYSTROM_ENDPOINT
 
 I recommend filling in the values in the .envrc-sample and renaming it to .envrc 
 
